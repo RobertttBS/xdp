@@ -13,9 +13,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/asavie/xdp"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/robertttbs/xdp"
 	"github.com/vishvananda/netlink"
 )
 
@@ -33,10 +33,10 @@ var (
 )
 
 func main() {
-	flag.StringVar(&NIC, "interface", "ens9", "Network interface to attach to.")
+	flag.StringVar(&NIC, "interface", "veth2", "Network interface to attach to.")
 	flag.IntVar(&QueueID, "queue", 0, "The queue on the network interface to attach to.")
-	flag.StringVar(&SrcMAC, "srcmac", "b2968175b211", "Source MAC address to use in sent frames.")
-	flag.StringVar(&DstMAC, "dstmac", "ffffffffffff", "Destination MAC address to use in sent frames.")
+	flag.StringVar(&SrcMAC, "srcmac", "ba:9a:0c:1d:c1:69", "Source MAC address to use in sent frames.")
+	flag.StringVar(&DstMAC, "dstmac", "a2:d7:2e:64:0c:ec", "Destination MAC address to use in sent frames.")
 	flag.StringVar(&SrcIP, "srcip", "192.168.111.10", "Source IP address to use in sent frames.")
 	flag.StringVar(&DstIP, "dstip", "192.168.111.1", "Destination IP address to use in sent frames.")
 	flag.UintVar(&SrcPort, "srcport", 1234, "Source UDP port.")

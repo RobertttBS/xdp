@@ -6,7 +6,7 @@
 
 /*
 dumpframes demostrates how to receive frames from a network link using
-github.com/asavie/xdp package, it sets up an XDP socket attached to a
+github.com/robertttbs/xdp package, it sets up an XDP socket attached to a
 particular network link and dumps all frames it receives to standard output.
 */
 package main
@@ -18,8 +18,8 @@ import (
 	"log"
 	"net"
 
-	"github.com/asavie/xdp"
-	"github.com/asavie/xdp/examples/dumpframes/ebpf"
+	"github.com/robertttbs/xdp"
+	"github.com/robertttbs/xdp/examples/dumpframes/ebpf"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )

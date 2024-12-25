@@ -3,7 +3,7 @@ package ebpf
 import (
 	"fmt"
 
-	"github.com/asavie/xdp"
+	"github.com/robertttbs/xdp"
 	"github.com/cilium/ebpf"
 )
 
