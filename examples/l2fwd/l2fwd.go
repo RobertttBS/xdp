@@ -93,12 +93,29 @@ func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst n
 	}
 	defer inProg.Unregister(inLinkQueueID)
 
+	log.Printf("attaching XDP program for %s...", outLink.Attrs().Name)
+	outProg, err := xdp.NewProgram(outLinkQueueID + 1)
+	if err != nil {
+		log.Fatalf("failed to create xdp program for %s: %v\n", outLink.Attrs().Name, err)
+	}
+	if err := outProg.Attach(outLink.Attrs().Index); err != nil {
+		log.Fatalf("failed to attach xdp program to interface %s: %v\n", outLink.Attrs().Name, err)
+	}
+	defer outProg.Detach(outLink.Attrs().Index)
+
 	// Note: The XDP socket used for transmitting data does not need an EBPF program.
 	log.Printf("opening XDP socket for %s...", outLink.Attrs().Name)
 	outXsk, err := xdp.NewSocket(outLink.Attrs().Index, outLinkQueueID, nil)
 	if err != nil {
 		log.Fatalf("failed to open XDP socket for link %s: %v", outLink.Attrs().Name, err)
 	}
+
+	log.Printf("registering XDP socket for %s...", outLink.Attrs().Name)
+	if err := outProg.Register(outLinkQueueID, outXsk.FD()); err != nil {
+		fmt.Printf("error: failed to register socket in BPF map: %v\n", err)
+		return
+	}
+	defer outProg.Unregister(outLinkQueueID)
 
 	log.Printf("starting L2 forwarder...")
 

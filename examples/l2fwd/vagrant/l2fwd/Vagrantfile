@@ -2,7 +2,15 @@ $provision_script = <<-SCRIPT
 echo Installing packages...
 sudo dnf -y install golang ethtool tcpdump perf vim
 echo Fetching and building l2fwd...
-go get github.com/asavie/xdp/examples/l2fwd
+
+# clone the repository
+git clone https://github.com/robertttbs/xdp.git
+cd xdp/examples/l2fwd
+# build and copy to ~/go/bin/
+go build
+mkdir -p ~/go/bin
+cp l2fwd ~/go/bin/
+
 echo Increasing maximum locked memory size...
 sudo install 50-memlock.conf /etc/security/limits.d/50-memlock.conf
 echo Setting up the experiment...
@@ -12,7 +20,7 @@ echo 'Run `sudo ~/go/bin/l2fwd -verbose -inlink eth1 -outlink eth2 -inlinkdst 08
 SCRIPT
 
 Vagrant.configure("2") do |config|
-	config.vm.box = "fedora/30-cloud-base"
+	config.vm.box = "fedora/39-cloud-base"
 	config.vm.hostname = "l2fwd"
 	config.vm.provider "virtualbox" do |v|
 		v.name = "L2fwd"
