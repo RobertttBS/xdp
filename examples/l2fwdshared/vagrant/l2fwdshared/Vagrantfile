@@ -1,29 +1,30 @@
 $provision_script = <<-SCRIPT
 echo Installing packages...
 sudo dnf -y install golang ethtool tcpdump perf vim
-echo Fetching and building l2fwd...
+echo Fetching and building l2fwdshared...
 
 echo Increasing maximum locked memory size...
+cd /home/vagrant
 sudo install 50-memlock.conf /etc/security/limits.d/50-memlock.conf
 echo Setting up the experiment...
 sudo ./setup_experiment.sh
 echo Done.
 
-echo Building l2fwd...
-cd xdp/examples/l2fwd
+echo Building l2fwdshared...
+cd /home/vagrant/xdp/examples/l2fwdshared
 go build
 mkdir -p ~/go/bin
-cp l2fwd ~/go/bin/
+cp l2fwdshared ~/go/bin/
 echo Done.
 
-echo 'Run `sudo ~/go/bin/l2fwd -verbose -inlink eth1 -outlink eth2 -inlinkdst 08:00:27:0c:57:be -outlinkdst 08:00:27:bd:aa:9b` to start l2fwd.'
+echo 'Run `sudo ~/go/bin/l2fwdshared -verbose -inlink eth1 -outlink eth2 -inlinkdst 08:00:27:0c:57:be -outlinkdst 08:00:27:bd:aa:9b` to start l2fwdshared.'
 SCRIPT
 
 Vagrant.configure("2") do |config|
 	config.vm.box = "fedora/39-cloud-base"
-	config.vm.hostname = "l2fwd"
+	config.vm.hostname = "l2fwdshared"
 	config.vm.provider "virtualbox" do |v|
-		v.name = "L2fwd"
+		v.name = "l2fwdshared"
 		v.memory = 1024
 		#v.cpus = 2
 	end

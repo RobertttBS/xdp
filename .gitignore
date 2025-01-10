@@ -17,3 +17,5 @@
 # ebpf binaries
 *.o
 
+.vagrant/
+
