@@ -75,7 +75,7 @@ func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst n
 	var err error
 	var umem *xdp.Umem
 
-	xdp.DefaultSocketFlags = unix.XDP_USE_NEED_WAKEUP
+	// xdp.DefaultSocketFlags = unix.XDP_USE_NEED_WAKEUP
 
 	if umem, err = xdp.NewUmem(nil, -1); err != nil {
 		log.Fatalf("failed to create umem: %v", err)
@@ -217,7 +217,8 @@ func forwardFrames(input *xdp.Socket, output *xdp.Socket, dstMac net.HardwareAdd
 	}
 	outDescs = outDescs[:len(inDescs)]
 
-	output.Transmit(outDescs)
+	output.TransmitNonWakeUp(outDescs)
+	// output.Transmit(outDescs)
 
 	return
 }

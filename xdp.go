@@ -583,6 +583,35 @@ func (xsk *Socket) Transmit(descs []Desc) (numSubmitted int) {
 	return
 }
 
+// TransmitNonWakeUp submits the given descriptors to the Tx ring queue without using
+// XDP_USE_NEED_WAKEUP flag. It returns the number of descriptors that were actually
+// pushed onto the queue. This function is designed for scenarios where the socket
+// is not bound with XDP_USE_NEED_WAKEUP flag, meaning the kernel will automatically
+// process the packets without explicit wakeup calls.
+//
+// The descriptors can be acquired either by calling the GetDescs() method or
+// by calling Receive() method.
+func (xsk *Socket) TransmitNonWakeUp(descs []Desc) (numSubmitted int) {
+	numFreeSlots := xsk.NumFreeTxSlots()
+	if len(descs) > numFreeSlots {
+		descs = descs[:numFreeSlots]
+	}
+
+	prod := *xsk.txRing.Producer
+	for _, desc := range descs {
+		xsk.txRing.Descs[prod&uint32(xsk.options.TxRingNumDescs-1)] = desc
+		prod++
+		xsk.freeTXDescs[desc.Addr/uint64(xsk.options.FrameSize)] = false
+	}
+	//fencer.SFence()
+	*xsk.txRing.Producer = prod
+
+	xsk.numTransmitted += len(descs)
+	numSubmitted = len(descs)
+
+	return
+}
+
 // FD returns the file descriptor associated with this xdp.Socket which can be
 // used e.g. to do polling.
 func (xsk *Socket) FD() int {
