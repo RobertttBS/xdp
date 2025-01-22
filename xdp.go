@@ -335,7 +335,7 @@ func NewUmem(options *SocketOptions, fd int) (umem *Umem, err error) {
 // interface.
 func NewSocket(Ifindex int, QueueID int, options *SocketOptions) (xsk *Socket, err error) {
 	var umem *Umem
-	if umem, err = NewUmem(nil, -1); err != nil {
+	if umem, err = NewUmem(options, -1); err != nil {
 		return nil, err
 	} else if umem == nil {
 		return nil, fmt.Errorf("NewUmem failed: umem is nil")
