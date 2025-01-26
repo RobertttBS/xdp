@@ -533,6 +533,27 @@ func (xsk *Socket) Receive(num int) []Desc {
 	return descs
 }
 
+// Receive returns the descriptors which were filled, i.e. into which frames
+// were received into.
+func (xsk *Socket) ReceiveAll() []Desc {
+	num := xsk.NumReceived()
+
+	descs := xsk.rxDescs[:0]
+	cons := *xsk.rxRing.Consumer
+	//fencer.LFence()
+	for i := 0; i < num; i++ {
+		descs = append(descs, xsk.rxRing.Descs[cons&uint32(xsk.options.RxRingNumDescs-1)])
+		cons++
+		xsk.freeRXDescs[descs[i].Addr/uint64(xsk.options.FrameSize)] = true
+	}
+	//fencer.MFence()
+	*xsk.rxRing.Consumer = cons
+
+	xsk.numFilled -= len(descs)
+
+	return descs
+}
+
 // Transmit submits the given descriptors to be sent out, it returns how many
 // descriptors were actually pushed onto the Tx ring queue.
 // The descriptors can be acquired either by calling the GetDescs() method or
