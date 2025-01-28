@@ -212,22 +212,8 @@ func forwardFrames(input *xdp.Socket, output *xdp.Socket, dstMac net.HardwareAdd
 	inDescs := input.Receive(input.NumReceived())
 	replaceDstMac(input, inDescs, dstMac)
 
-	outDescs := output.GetDescs(output.NumFreeTxSlots(), false)
-
-	if len(inDescs) > len(outDescs) {
-		inDescs = inDescs[:len(outDescs)]
-	}
-	numFrames = uint64(len(inDescs))
-
-	for i := 0; i < len(inDescs); i++ {
-		outDescs[i].Addr = inDescs[i].Addr
-		outDescs[i].Len = inDescs[i].Len
-		numBytes += uint64(outDescs[i].Len)
-	}
-	outDescs = outDescs[:len(inDescs)]
-
-	output.TransmitNonWakeUp(outDescs)
-	// output.Transmit(outDescs)
+	output.TransmitNonWakeUp(inDescs)
+	// output.Transmit(inDescs)
 
 	return
 }
