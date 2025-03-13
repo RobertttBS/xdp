@@ -685,10 +685,6 @@ func (xsk *Socket) GetDescs(n int, rx bool) []Desc {
 			n = cap(xsk.getTXDescs)
 		}
 	}
-	// numOfUMEMChunks := len(xsk.freeRXDescs) / 2
-	// if n > numOfUMEMChunks {
-	// 	n = numOfUMEMChunks
-	// }
 
 	descs := xsk.getRXDescs[:0]
 	j := 0
@@ -703,6 +699,37 @@ func (xsk *Socket) GetDescs(n int, rx bool) []Desc {
 	}
 	for i := start; i < end && j < n; i++ {
 		if freeList[i] == true {
+			descs = append(descs, Desc{
+				Addr: uint64(i) * uint64(xsk.options.FrameSize),
+				Len:  uint32(xsk.options.FrameSize),
+			})
+			j++
+		}
+	}
+	return descs
+}
+
+// GetHalfUmemDescs returns up to n descriptors which are not currently in use.
+// if top is true, return desc in top half of umem, bottom half otherwise.
+// The descriptors must be submitted to the Fill ring queue using the Fill().
+// Can't be used to get descriptors for Tx ring queue.
+// This function if for shared UMEM across NICs, which allocates half of the
+// UMEM for each NIC.
+func (xsk *Socket) GetDescsSharedUmem(n int, top bool) []Desc {
+	if n > cap(xsk.getRXDescs) {
+		n = cap(xsk.getRXDescs)
+	}
+
+	descs := xsk.getRXDescs[:0]
+	j := 0
+	start := 0
+	end := cap(xsk.getRXDescs)
+	freeList := xsk.freeRXDescs
+	if !top {
+		start = cap(xsk.getRXDescs)
+	}
+	for i := start; i < end && j < n; i++ {
+		if freeList[i] {
 			descs = append(descs, Desc{
 				Addr: uint64(i) * uint64(xsk.options.FrameSize),
 				Len:  uint32(xsk.options.FrameSize),
