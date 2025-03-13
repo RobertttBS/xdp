@@ -19,6 +19,15 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+var socketOptions = xdp.SocketOptions{
+	NumFrames:              4096,
+	FrameSize:              2048,
+	FillRingNumDescs:       2048,
+	CompletionRingNumDescs: 1024,
+	RxRingNumDescs:         1024,
+	TxRingNumDescs:         1024,
+}
+
 func main() {
 	var inLinkName string
 	var inLinkDstStr string
@@ -75,9 +84,9 @@ func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst n
 	var err error
 	var umem *xdp.Umem
 
-	xdp.DefaultSocketFlags = unix.XDP_USE_NEED_WAKEUP
+	// xdp.DefaultSocketFlags = unix.XDP_USE_NEED_WAKEUP
 
-	if umem, err = xdp.NewUmem(nil, -1); err != nil {
+	if umem, err = xdp.NewUmem(&socketOptions, -1); err != nil {
 		log.Fatalf("failed to create umem: %v", err)
 	} else if umem == nil {
 		log.Fatal("umem creation returned nil")
@@ -94,7 +103,7 @@ func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst n
 	defer inProg.Detach(inLink.Attrs().Index)
 
 	log.Printf("opening XDP socket for %s...", inLink.Attrs().Name)
-	inXsk, err := xdp.NewSocketShared(inLink.Attrs().Index, inLinkQueueID, nil, umem)
+	inXsk, err := xdp.NewSocketShared(inLink.Attrs().Index, inLinkQueueID, &socketOptions, umem)
 	if err != nil {
 
 		log.Fatalf("failed to open XDP socket for link %s: %v", inLink.Attrs().Name, err)
@@ -119,7 +128,7 @@ func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst n
 
 	// Open output XDP socket with the same UMEM as the input socket
 	log.Printf("opening XDP socket for %s...", outLink.Attrs().Name)
-	outXsk, err := xdp.NewSocketShared(outLink.Attrs().Index, outLinkQueueID, nil, umem)
+	outXsk, err := xdp.NewSocketShared(outLink.Attrs().Index, outLinkQueueID, &socketOptions, umem)
 	if err != nil {
 		log.Fatalf("failed to open XDP socket for link %s: %v", outLink.Attrs().Name, err)
 	}
@@ -203,21 +212,8 @@ func forwardFrames(input *xdp.Socket, output *xdp.Socket, dstMac net.HardwareAdd
 	inDescs := input.Receive(input.NumReceived())
 	replaceDstMac(input, inDescs, dstMac)
 
-	outDescs := output.GetDescs(output.NumFreeTxSlots(), false)
-
-	if len(inDescs) > len(outDescs) {
-		inDescs = inDescs[:len(outDescs)]
-	}
-	numFrames = uint64(len(inDescs))
-
-	for i := 0; i < len(inDescs); i++ {
-		outDescs[i].Addr = inDescs[i].Addr
-		outDescs[i].Len = inDescs[i].Len
-		numBytes += uint64(outDescs[i].Len)
-	}
-	outDescs = outDescs[:len(inDescs)]
-
-	output.Transmit(outDescs)
+	output.TransmitNonWakeUp(inDescs)
+	// output.Transmit(inDescs)
 
 	return
 }

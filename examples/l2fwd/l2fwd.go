@@ -19,6 +19,15 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+var socketOptions = xdp.SocketOptions{
+	NumFrames:              4096,
+	FrameSize:              2048,
+	FillRingNumDescs:       2048,
+	CompletionRingNumDescs: 1024,
+	RxRingNumDescs:         1024,
+	TxRingNumDescs:         1024,
+}
+
 func main() {
 	var inLinkName string
 	var inLinkDstStr string
@@ -82,7 +91,7 @@ func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst n
 	}
 	defer inProg.Detach(inLink.Attrs().Index)
 	log.Printf("opening XDP socket for %s...", inLink.Attrs().Name)
-	inXsk, err := xdp.NewSocket(inLink.Attrs().Index, inLinkQueueID, nil)
+	inXsk, err := xdp.NewSocket(inLink.Attrs().Index, inLinkQueueID, &socketOptions)
 	if err != nil {
 		log.Fatalf("failed to open XDP socket for link %s: %v", inLink.Attrs().Name, err)
 	}
@@ -105,7 +114,7 @@ func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst n
 
 	// Note: The XDP socket used for transmitting data does not need an EBPF program.
 	log.Printf("opening XDP socket for %s...", outLink.Attrs().Name)
-	outXsk, err := xdp.NewSocket(outLink.Attrs().Index, outLinkQueueID, nil)
+	outXsk, err := xdp.NewSocket(outLink.Attrs().Index, outLinkQueueID, &socketOptions)
 	if err != nil {
 		log.Fatalf("failed to open XDP socket for link %s: %v", outLink.Attrs().Name, err)
 	}
@@ -142,23 +151,25 @@ func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst n
 	fds[0].Fd = int32(inXsk.FD())
 	fds[1].Fd = int32(outXsk.FD())
 	for {
+		// fmt.Printf("polling...\n")
 		inXsk.Fill(inXsk.GetDescs(inXsk.NumFreeFillSlots(), true))
 		outXsk.Fill(outXsk.GetDescs(outXsk.NumFreeFillSlots(), true))
 
-		fds[0].Events = unix.POLLIN
+		fds[0].Events = unix.POLLIN | unix.POLLOUT
 		if inXsk.NumTransmitted() > 0 {
 			fds[0].Events |= unix.POLLOUT
 		}
 
-		fds[1].Events = unix.POLLIN
+		fds[1].Events = unix.POLLIN | unix.POLLOUT
 		if outXsk.NumTransmitted() > 0 {
 			fds[1].Events |= unix.POLLOUT
 		}
 
 		fds[0].Revents = 0
 		fds[1].Revents = 0
-		_, err := unix.Poll(fds[:], -1)
+		_, err := unix.Poll(fds[:], 1000)
 		if err == syscall.EINTR {
+			fmt.Printf("INTR")
 			// EINTR is a non-fatal error that may occur due to ongoing syscalls that interrupt our poll
 			continue
 		} else if err != nil {
@@ -167,6 +178,7 @@ func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst n
 		}
 
 		if (fds[0].Revents & unix.POLLIN) != 0 {
+			fmt.Printf("receive packets")
 			numBytes, numFrames := forwardFrames(inXsk, outXsk, inLinkDst)
 			numBytesTotal += numBytes
 			numFramesTotal += numFrames
@@ -175,6 +187,7 @@ func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst n
 			inXsk.Complete(inXsk.NumCompleted())
 		}
 		if (fds[1].Revents & unix.POLLIN) != 0 {
+			fmt.Printf("receive packets")
 			numBytes, numFrames := forwardFrames(outXsk, inXsk, outLinkDst)
 			numBytesTotal += numBytes
 			numFramesTotal += numFrames
