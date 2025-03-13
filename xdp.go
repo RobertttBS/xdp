@@ -677,6 +677,7 @@ func (xsk *Socket) GetDescsSharedUmem(n int, top bool) []Desc {
 	freeList := xsk.freeRXDescs
 	if !top {
 		start = cap(xsk.getRXDescs)
+		end = len(xsk.freeRXDescs)
 	}
 	for i := start; i < end && j < n; i++ {
 		if freeList[i] {
