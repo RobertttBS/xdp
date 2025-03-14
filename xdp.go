@@ -149,7 +149,7 @@ type Socket struct {
 	ifindex                  int
 	numTransmitted           int
 	numFilled                int
-	freeRXDescs, freeTXDescs []bool
+	FreeRXDescs, FreeTXDescs []bool
 	options                  SocketOptions
 	rxDescs                  []Desc
 	getTXDescs, getRXDescs   []Desc
@@ -471,13 +471,13 @@ func NewSocketShared(Ifindex int, QueueID int, options *SocketOptions, umem *Ume
 		return nil, fmt.Errorf("syscall.Bind SockaddrXDP failed: %v", err)
 	}
 
-	xsk.freeRXDescs = make([]bool, options.NumFrames)
-	xsk.freeTXDescs = make([]bool, options.NumFrames)
-	for i := range xsk.freeRXDescs {
-		xsk.freeRXDescs[i] = true
+	xsk.FreeRXDescs = make([]bool, options.NumFrames)
+	xsk.FreeTXDescs = make([]bool, options.NumFrames)
+	for i := range xsk.FreeRXDescs {
+		xsk.FreeRXDescs[i] = true
 	}
-	for i := range xsk.freeTXDescs {
-		xsk.freeTXDescs[i] = true
+	for i := range xsk.FreeTXDescs {
+		xsk.FreeTXDescs[i] = true
 	}
 	xsk.getTXDescs = make([]Desc, 0, options.CompletionRingNumDescs)
 	xsk.getRXDescs = make([]Desc, 0, options.FillRingNumDescs)
@@ -499,7 +499,7 @@ func (xsk *Socket) Fill(descs []Desc) int {
 	for _, desc := range descs {
 		xsk.fillRing.Descs[prod&uint32(xsk.options.FillRingNumDescs-1)] = desc.Addr
 		prod++
-		xsk.freeRXDescs[desc.Addr/uint64(xsk.options.FrameSize)] = false
+		xsk.FreeRXDescs[desc.Addr/uint64(xsk.options.FrameSize)] = false
 	}
 	//fencer.SFence()
 	*xsk.fillRing.Producer = prod
@@ -523,7 +523,7 @@ func (xsk *Socket) Receive(num int) []Desc {
 	for i := 0; i < num; i++ {
 		descs = append(descs, xsk.rxRing.Descs[cons&uint32(xsk.options.RxRingNumDescs-1)])
 		cons++
-		xsk.freeRXDescs[descs[i].Addr/uint64(xsk.options.FrameSize)] = true
+		xsk.FreeRXDescs[descs[i].Addr/uint64(xsk.options.FrameSize)] = true
 	}
 	//fencer.MFence()
 	*xsk.rxRing.Consumer = cons
@@ -544,7 +544,7 @@ func (xsk *Socket) ReceiveAll() []Desc {
 	for i := 0; i < num; i++ {
 		descs = append(descs, xsk.rxRing.Descs[cons&uint32(xsk.options.RxRingNumDescs-1)])
 		cons++
-		xsk.freeRXDescs[descs[i].Addr/uint64(xsk.options.FrameSize)] = true
+		xsk.FreeRXDescs[descs[i].Addr/uint64(xsk.options.FrameSize)] = true
 	}
 	//fencer.MFence()
 	*xsk.rxRing.Consumer = cons
@@ -568,7 +568,7 @@ func (xsk *Socket) Transmit(descs []Desc) (numSubmitted int) {
 	for _, desc := range descs {
 		xsk.txRing.Descs[prod&uint32(xsk.options.TxRingNumDescs-1)] = desc
 		prod++
-		xsk.freeTXDescs[desc.Addr/uint64(xsk.options.FrameSize)] = false
+		xsk.FreeTXDescs[desc.Addr/uint64(xsk.options.FrameSize)] = false
 	}
 	//fencer.SFence()
 	*xsk.txRing.Producer = prod
@@ -622,7 +622,7 @@ func (xsk *Socket) TransmitNonWakeUp(descs []Desc) (numSubmitted int) {
 	for _, desc := range descs {
 		xsk.txRing.Descs[prod&uint32(xsk.options.TxRingNumDescs-1)] = desc
 		prod++
-		xsk.freeTXDescs[desc.Addr/uint64(xsk.options.FrameSize)] = false
+		xsk.FreeTXDescs[desc.Addr/uint64(xsk.options.FrameSize)] = false
 	}
 	//fencer.SFence()
 	*xsk.txRing.Producer = prod
@@ -690,11 +690,11 @@ func (xsk *Socket) GetDescs(n int, rx bool) []Desc {
 	j := 0
 	start := 0
 	end := cap(xsk.getRXDescs)
-	freeList := xsk.freeRXDescs
+	freeList := xsk.FreeRXDescs
 	if !rx {
 		start = cap(xsk.getRXDescs)
-		end = len(xsk.freeTXDescs)
-		freeList = xsk.freeTXDescs
+		end = len(xsk.FreeTXDescs)
+		freeList = xsk.FreeTXDescs
 		descs = xsk.getTXDescs[:0]
 	}
 	for i := start; i < end && j < n; i++ {
@@ -724,10 +724,10 @@ func (xsk *Socket) GetDescsSharedUmem(n int, top bool) []Desc {
 	j := 0
 	start := 0
 	end := cap(xsk.getRXDescs)
-	freeList := xsk.freeRXDescs
+	freeList := xsk.FreeRXDescs
 	if !top {
 		start = cap(xsk.getRXDescs)
-		end = len(xsk.freeRXDescs)
+		end = len(xsk.FreeRXDescs)
 	}
 	for i := start; i < end && j < n; i++ {
 		if freeList[i] {
@@ -807,7 +807,7 @@ func (xsk *Socket) Complete(n int) {
 	for i := 0; i < n; i++ {
 		addr := xsk.completionRing.Descs[cons&uint32(xsk.options.CompletionRingNumDescs-1)]
 		cons++
-		xsk.freeTXDescs[addr/uint64(xsk.options.FrameSize)] = true
+		xsk.FreeTXDescs[addr/uint64(xsk.options.FrameSize)] = true
 	}
 	//fencer.MFence()
 	*xsk.completionRing.Consumer = cons
